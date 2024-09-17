@@ -1,0 +1,702 @@
+---
+title: "Final Paper: Energy Consumption Trends"
+author: "STOR 320.01 Group 2"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(kableExtra)
+library(leaps)
+library(purrr)
+library(modelr)
+library(corrplot)
+library(broom)
+library(tibble)
+```
+
+```{r, include = F, warning = F}
+PrimaryEnergyOverview = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Primary_Energy_Overview.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+PrimaryEnergyBySource = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Primary_Energy_Consumption_by_Source.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+EnergyConsumptionA = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Energy_ConsumptionA.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+EnergyConsumptionB = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Energy_ConsumptionB.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+
+colnames(PrimaryEnergyOverview) <- c("Month",	"Total Fossil Fuels Production","Nuclear Electric Power Production", "Total Renewable Energy Production",	"Total Primary Energy Production",	"Primary Energy Imports", "Primary Energy Exports",	"Primary Energy Net Imports",	"Primary Energy Stock Change and Other",	"Total Fossil Fuels Consumption",	"Nuclear Electric Power Consumption",	"Total Renewable Energy Consumption",	"Total Primary Energy Consumption")
+
+colnames(PrimaryEnergyBySource) <- c("Month",	"Coal Consumption",	"Natural Gas Consumption (Excluding Supplemental Gaseous Fuels)",	"Petroleum Consumption (Excluding Biofuels)",	"Total Fossil Fuels Consumption",	"Nuclear Electric Power Consumption",	"Hydroelectric Power Consumption",	"Geothermal Energy Consumption",	"Solar Energy Consumption",	"Wind Energy Consumption",	"Biomass Energy Consumption",	"Total Renewable Energy Consumption",	"Total Primary Energy Consumption")
+
+colnames(EnergyConsumptionA) <- c("Month",	"Primary Energy Consumed by the Residential Sector",	"Electricity Sales to Ultimate Customers in the Residential Sector",	"End-Use Energy Consumed by the Residential Sector",	"Residential Sector Electrical System Energy Losses",	"Total Energy Consumed by the Residential Sector",	"Primary Energy Consumed by the Commercial Sector",	"Electricity Sales to Ultimate Customers in the Commercial Sector",	"End-Use Energy Consumed by the Commercial Sector",	"Commercial Sector Electrical System Energy Losses",	"Total Energy Consumed by the Commercial Sector",	"Primary Energy Consumed by the Industrial Sector",	"Electricity Sales to Ultimate Customers in the Industrial Sector",	"End-Use Energy Consumed by the Industrial Sector",	"Industrial Sector Electrical System Energy Losses",	"Total Energy Consumed by the Industrial Sector")
+
+colnames(EnergyConsumptionB) <- c("Month",	"Total Primary Energy Consumed by the Transportation Sector",	"Electricity Sales to Ultimate Customers in the Transportation Sector",	"End-Use Energy Consumed by the Transportation Sector",	"Electrical System Energy Losses Proportioned to the Transportation Sector",	"Total Energy Consumed by the Transportation Sector",	"Total Primary Energy Consumed by the End-Use Sectors",	"Electricity Sales to Ultimate Customers in the End-Use Sectors",	"End-Use Energy Consumed by the End-Use Sectors",	"Total Electrical Energy System Losses Proportioned to the End-Use Sectors",	"Total Energy Consumed by the End-Use-Sectors",	"Primary Energy Consumed by the Electric Power Sector",	"Primary Energy Consumption Total")
+
+PrimaryEnergyOverview = PrimaryEnergyOverview %>%
+  mutate_at(2:13, as.numeric)
+
+PrimaryEnergyBySource = PrimaryEnergyBySource %>%
+  mutate_at(2:13, as.numeric)
+
+EnergyConsumptionA = EnergyConsumptionA %>%
+  mutate_at(2:16, as.numeric)
+
+EnergyConsumptionB = EnergyConsumptionB %>%
+  mutate_at(2:13, as.numeric)
+
+tri_convert = function(vector){
+  y = vector * 1000
+return(y)}
+
+PrimaryEnergyOverview = PrimaryEnergyOverview %>%
+  mutate_at(2:13, tri_convert)
+
+PrimaryEnergyBySource = PrimaryEnergyBySource %>%
+  mutate_at(2:13, tri_convert)
+
+EnergyConsumption = full_join(EnergyConsumptionA, EnergyConsumptionB, by = "Month")
+Energy = full_join(PrimaryEnergyOverview, EnergyConsumption, by = "Month")
+
+Energy = Energy %>%
+  separate(Month,
+           into = c("Year", "Month"), 
+           sep = " ") %>%
+  mutate_at(1, as.numeric)
+```
+
+
+# INTRODUCTION
+From turning the lights on in our houses and charging devices to keeping a whole city, state, and country functioning, energy is heavily integrated into our daily lives. However, the average person does not give much thought to how it is produced and how it is consumed. As America’s energy industry is based on a highly competitive capitalist model, all of us in Group 2 were curious to examine the inner workings of the US energy industry and its implications for the national economy. We attempted to see if energy is related to US economic trends and investigate potential reasons behind certain changes in the energy industry of the US. 
+
+
+We used various models to use pre-pandemic energy usage data to predict pandemic energy usage, intending to measure the impact of past economic trends to predict COVID-19 energy usage. As we are all painfully aware, a lot has changed since the global shutdowns in March 2020. Travel restrictions and isolation became the norm. Although we are familiar with the social impacts of the pandemic, we hope to use the energy usage information to reflect on the economic implications of the pandemic and provide insight in preparation for future periods of unexpected economic decline.
+
+
+Additionally, we noticed an interesting trend with the correlation between energy exports and imports: exports remained lower than a quadrillion BTU until the 21st century, when numbers started rapidly growing. We wanted to dive deeper and investigate the status of the US as a net energy importer or exporter. This is an important question to answer, as it determines where the country should allocate its money and resources. Predicting how the US will behave in the future has an impact on one’s personal education and career choice(s) as well — nobody wants to spend time and effort working in an industry that is predicted to ultimately die out in the future.
+
+
+By asking these questions, we hope to gain a better understanding of what factors drive the energy industry by analyzing what relationships could exist. Ultimately, the answers to our questions can be used to evaluate the effect of current economic policies on energy usage and prepare us for future events.
+
+
+# DATA
+The data that we explored came from the U.S. [Energy Information Administration (EIA)](https://www.eia.gov/). The four datasets we worked with throughout the semester were taken from the Total Energy section of the source. To tidy the data, we joined the datasets of [Primary Energy Overview](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T01.01#/?f=M&start=200001), [Primary Energy Consumption by Source](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T01.03#/?f=M), [Energy Consumption A](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T02.01A#/?f=M&start=200001), and [Energy Consumption B](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T02.01B#/?f=M&start=200001) into a dataset called **Energy**. This merged dataset consisted of 611 rows, each containing information on energy consumption for each month from January 1973 to November 2023 with 42 variables. 
+
+
+The table below displays a modified version of the dataset, which includes only the variables used to answer the first question. The variables *Year* and *Month* refer to the specific year and month the data was collected. The four major sectors are *Residential*, *Commercial*, *Industrial*, and *Transportation*. The residential sector refers to private households; the commercial sector refers to non-manufacturing businesses (such as retail/wholesale stores, restaurants, and offices); the industrial sector is associated with businesses involved in manufacturing and producing; and the transportation sector provides transportation services and infrastructure. *Total Energy Consumed by the Residential Sector* refers to the energy that was used that month within the residential sector and is the result of adding the *End-Use Energy Consumed by the Residential Sector* and the *Electrical System Energy Losses Proportional to the Residential Sector* in the original dataset. The same process was used to find the *Total Energy Consumed* for each of the remaining three sectors. All energy units were converted to trillions of BTUs (British Thermal Units) to make the information easily readable. 
+
+```{r, echo = F}
+Energy$Date = paste(Energy$Year, Energy$Month, "01", sep = " ")
+Energy$Date = as.Date(Energy$Date, "%Y %B %d")
+
+DATA1 = Energy %>%
+  select(Year, Month, contains("Total Energy Consumed"), -contains("End-Use-Sectors"))
+
+DATA1 %>%
+  head() %>%
+  kbl(caption = "Question 1 Dataset Glimpse", "html") %>%
+  kable_paper("hover")
+```
+
+Based on this table, we developed a line graph showing the change in energy usage trends for each sector. We identified the time frames of economic recession according to [Investopedia](https://www.investopedia.com/articles/economics/08/past-recessions.asp). We noticed an evident drop in *Total Energy Consumption* for each section in the shaded regions. Different recessions had different ranges of drops, which served as a great starting point for why we wanted to investigate further on this question.
+
+```{r, echo = F, message = F}
+# used to make legend in plot
+colors = c("Industrial" = "#564D80", "Transportation" = "#33202a", "Residential" = "#8aea92", "Commercial" = "#80ada0", "Recession" = "#a1a1a1")
+
+Energy %>%
+  select(Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  ggplot(aes(x = Date)) +
+  # iran pt 1
+    geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("1980-01-01"), xmax = as.Date("1982-11-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # gulf war
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("1990-07-01"), xmax = as.Date("1991-03-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # dot bomb
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("2001-03-01"), xmax = as.Date("2001-11-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # housing crisis
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("2007-12-01"), xmax = as.Date("2009-06-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # covid
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("2020-02-01"), xmax = as.Date("2023-11-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # sector consumption. span argument used to remove sharp differences between months.
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Residential Sector`, color = "Residential")) +
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Commercial Sector`, color = "Commercial")) +
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Industrial Sector`, color = "Industrial")) +
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Transportation Sector`, color = "Transportation")) +
+  scale_color_manual(name = "Sector", values = colors) +
+  scale_fill_manual(name = " ", values = colors) +
+  labs(y = "Total Energy Consumption (Trillion Btu)", x = "Date", title = "Changes in Total Energy Consumption by Sector over Time")
+
+# free up memory
+rm(colors)
+```
+
+For our second question, we wanted to explore the nature of export and import patterns in the US to determine what the future export/import relationship will be. The graph below shows the relationship between imports and exports every year from 2000 to 2023 using the variables *Primary Energy Imports* and *Primary Energy Exports*, which are not sector-specific. The plot is narrowed into 2000 and beyond because of our observation mentioned above; there were sudden changes in export values from 2000 onward, so it seemed reasonable to set the basis of our models to relevant date ranges.
+
+```{r, echo = F, message = F}
+ImpExp = PrimaryEnergyOverview %>%
+  separate(Month, into = c("Year", "Month"), sep = " ") %>%
+  group_by(Year) %>%
+  mutate_at(1, as.numeric) %>%
+         mutate_at(1, as.character) %>%
+  filter(Year >= 2000) %>%
+  mutate(`Primary Energy Net Exports` = `Primary Energy Exports` - `Primary Energy Imports`) 
+
+ggplot(ImpExp, 
+       aes(x=`Primary Energy Imports`, y=`Primary Energy Exports`, color = Year)) +
+  geom_point() +
+  labs(title = "Relationship between Annual Primary Energy Imports and Exports",
+       x = "Primary Imports (trillion BTU)", y = "Primary Exports (trillion BTU)")
+```
+
+
+To further analyze possible descriptive variables, we selected variables that are relevant to energy consumption to import and production to export. In addition to the *Year* and *Month* variables that indicate the time frame, we included *Total Fossil Fuels Production*, *Nuclear Electric Power Production*, *Total Renewable Energy Production*, *Total Primary Energy Production*, *Primary Energy Imports*, *Primary Energy Exports*, *Primary Energy Net Imports*, *Primary Energy Stock Change and Other*, *Total Fossil Fuels Consumption*, *Nuclear Electric Power Consumption*, *Total Renewable Energy Consumption*, and *Total Primary Energy Consumption*. We added the variable of *Primary Energy Net Exports* as most energy analyses work with net exports rather than imports. Most of the variables are self-explanatory based on the names. The EIA collected total energy production or consumption of various forms of energy — nonrenewable, renewable, electricity, etc. We hope to build upon the 15 variables to find relationships that could explain the future net import or export trends of the US.
+
+```{r, echo = F}
+ImpExp %>%
+  head() %>%
+  kbl(caption = "Question 2 Dataset Glimpse", "html") %>%
+  kable_paper("hover")
+```
+
+
+# RESULTS
+## Q1: To what extent did past economic trends affect energy usage by sector during COVID-19?
+
+
+We initially used a linear model to test if past energy consumption trends leading up to COVID-19 were accurate predictors of the economic recession. To do this, we used the data between 1973 and 2017 (inclusive) to train the model and the data from 2018 to 2019 (inclusive) to test the model. We created a new variable *Date* to include a numerical value of both *Year* and *Month*. To follow the date format in R, we added the date of the 1st as each observation is an average monthly value. We focused on the *Total Energy Consumed* by the four sectors. Because people’s consumption behaviors are differently affected by certain events, we concluded that it was reasonable to split the train and test data by sectors. We renamed the variables and gathered them to add a variable for *Sector* and named the values *EnergyUsage*. We utilized the lead function to mutate a new variable *NextUsage*. This variable stores the next *EnergyUsage* value, so each row contains the current and next month’s energy usage. 
+
+```{r, include = F, message = F}
+TRAIN = Energy %>%
+  select(Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  rename("Residential" = "Total Energy Consumed by the Residential Sector", "Commercial" = "Total Energy Consumed by the Commercial Sector", "Industrial" = "Total Energy Consumed by the Industrial Sector", "Transportation" = "Total Energy Consumed by the Transportation Sector") %>%
+  filter(between(Date, as.Date("1973-01-01"), as.Date("2017-12-01"))) %>%
+  gather(2:5, key = "Sector", value = EnergyUsage)
+# gathered to add the sector variable
+
+#I used lead() to add another variable that includes the following month's energy usage. This way, each row of dataset has the current and next months energy usage. I did this per sector
+Train.Res = TRAIN %>%
+  filter(Sector == "Residential") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage)))
+
+Train.Com = TRAIN %>%
+  filter(Sector == "Commercial") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage)))
+
+Train.Ind = TRAIN %>%
+  filter(Sector == "Industrial") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage)))
+
+Train.Tran = TRAIN %>%
+  filter(Sector == "Transportation") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage)))
+
+# I built a linear model to see how this month's energy usage relates to next month's energy usage per sector
+Res.model = lm(NextUsage ~ EnergyUsage, data = Train.Res)
+summary(Res.model)
+
+Com.model = lm(NextUsage ~ EnergyUsage, data = Train.Com)
+summary(Com.model)
+
+Ind.model = lm(NextUsage ~ EnergyUsage, data = Train.Ind)
+summary(Ind.model)
+
+Tran.model = lm(NextUsage ~ EnergyUsage, data = Train.Tran)
+summary(Tran.model)
+
+# same process above but for data between 2018 and 2019
+TEST = Energy %>%
+  select(Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  rename("Residential" = "Total Energy Consumed by the Residential Sector", "Commercial" = "Total Energy Consumed by the Commercial Sector", "Industrial" = "Total Energy Consumed by the Industrial Sector", "Transportation" = "Total Energy Consumed by the Transportation Sector") %>%
+  filter(between(Date, as.Date("2018-01-01"), as.Date("2019-12-01"))) %>%
+  gather(2:5, key = "Sector", value = EnergyUsage)
+
+Test.Res = TEST %>%
+  filter(Sector == "Residential") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage)))%>%
+  add_predictions(Res.model,var="Predict") %>%
+  add_residuals(Res.model,var="Residual")%>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+Test.Com = TEST %>%
+  filter(Sector == "Commercial") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Com.model,var="Predict") %>%
+  add_residuals(Com.model,var="Residual")%>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+Test.Ind = TEST %>%
+  filter(Sector == "Industrial") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Ind.model,var="Predict") %>%
+  add_residuals(Ind.model,var="Residual")%>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+Test.Tran = TEST %>%
+  filter(Sector == "Transportation") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Tran.model,var="Predict") %>%
+  add_residuals(Tran.model,var="Residual")%>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+# combined all the test data
+TEST.FINAL = rbind(Test.Res, Test.Tran,  Test.Ind, Test.Com)
+```
+
+```{r, echo = F, warning = F}
+Train.Res %>%
+  head() %>%
+  kbl(caption = "Trained Data from 1973 to 2017", "html") %>%
+  kable_paper("hover")
+```
+
+The train data was used to create a linear model through the lm() function. The test data was used to gather *Mean Absolute Errors (MAE)*, *Mean Squared Errors (MSE)*, and *Root Mean Squared Errors (RMSE)* for each tested prediction by using the functions of add_predictions() and add_residuals() based on each sector’s model. Once the test and train data was fully generated, we attempted to predict the effect the COVID-19 recession had on energy usage using the predictive model we generated.
+
+
+```{r, include = F}
+# I repeated the process above for covid data (post 2020)
+COVID = Energy %>%
+  select(Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  rename("Residential" = "Total Energy Consumed by the Residential Sector", "Commercial" = "Total Energy Consumed by the Commercial Sector", "Industrial" = "Total Energy Consumed by the Industrial Sector", "Transportation" = "Total Energy Consumed by the Transportation Sector") %>%
+  filter(between(Date, as.Date("2020-01-01"), as.Date("2023-11-01"))) %>%
+  gather(2:5, key = "Sector", value = EnergyUsage)
+
+# I used add_predictions and add_residuals based on the specific linear models for each sector. I also repeated lead to compare the actual nextusage and predicted next usage
+COVID.Res = COVID %>%
+  filter(Sector == "Residential") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Res.model,var="Predict") %>%
+  add_residuals(Res.model,var="Residual") %>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+COVID.Com = COVID %>%
+  filter(Sector == "Commercial") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Com.model,var="Predict") %>%
+  add_residuals(Com.model,var="Residual") %>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+COVID.Ind = COVID %>%
+  filter(Sector == "Industrial") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Ind.model,var="Predict") %>%
+  add_residuals(Ind.model,var="Residual") %>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+COVID.Tran = COVID %>%
+  filter(Sector == "Transportation") %>%
+  mutate(NextUsage = lead(as.vector(EnergyUsage))) %>%
+  add_predictions(Tran.model,var="Predict") %>%
+  add_residuals(Tran.model,var="Residual") %>%
+  mutate(MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T)))
+
+# i once again combined all of them to see them 
+COVID.FINAL = rbind(COVID.Res, COVID.Tran, COVID.Ind, COVID.Com)
+```
+
+```{r, echo = F}
+# calculation of the mae and mse for the test and covid and visually present them in a pretty way. Both mae and mse are extremely high, showing that this linear model might not work best.
+TF = TEST.FINAL %>%
+  select(Sector, MAE, MSE, RMSE) %>%
+  slice(1, 25, 49, 73)
+
+CF = COVID.FINAL %>%
+  select(Sector, MAE, MSE, RMSE) %>%
+  slice(1, 48, 95, 142)
+
+LR = cbind(TF[,1],TF[,2], CF[,2],TF[,3], CF[,3], TF[,4], CF[,4])
+
+colnames(LR) <- c("Sector", "MAE (2018-2019)", "MAE (2020-)", "MSE (2018-2019)", "MSE (2020-)", "RMSE (2018-2019)", "RMSE (2020-)")
+
+LR %>%
+  kbl(caption = "Linear Regression Model for Q1") %>%
+  kable_paper("hover")
+```
+
+
+Our model was generally inaccurate when predicting the effect of the COVID-19 recession and estimating economic trends. As shown in the table above, the values for the *MAE*, *MSE*, and *RMSE* are all extremely high. This shows that our model couldn’t accurately predict the effect COVID-19 had on energy usage. To build a more accurate model, we used the k-fold cross-validation model.
+
+
+We built a correlation model to identify if certain variables had a positive relationship with total energy consumption for each sector. For the visual, we indiciated production as P and consumption as C. We also abbreviated the sectors after the semi-colon. We focused on almost every variable in the original data set with a specific focus on *Total Energy Consumed*, *Electricity Sales to Ultimate Customers*, and *Electrical System Energy Losses* for each sector. Although both *Nuclear Electric Power Production* and *Nuclear Electric Power Consumption* had strong positive correlations with the energy consumption of specific sectors, we decided to exclude *Nuclear Electric Power Consumption* on the basis of it being identical to *Nuclear Electric Power Production* in the raw dataset.
+
+
+```{r, echo = F, warning = F, fig.dim = c(10,10)}
+NewEnergy <- Energy %>%
+  filter(Year<2017) %>%
+  select(-contains("End-Use"), -`Primary Energy Consumed by the Electric Power Sector`, -`Primary Energy Consumption Total`, -`Primary Energy Consumed by the Residential Sector`, -`Primary Energy Consumed by the Commercial Sector`, -`Primary Energy Consumed by the Industrial Sector`, -`Total Primary Energy Consumed by the Transportation Sector`)
+
+cor.input2 <- NewEnergy %>%
+  rename(`P:Nuclear` = `Nuclear Electric Power Production`,
+         `P:Primary` = `Total Primary Energy Production`,
+         `P:Fossil` = `Total Fossil Fuels Production`,
+         `P:Renew` = `Total Renewable Energy Production`,
+         `Imports` = `Primary Energy Imports`,
+         `Exports` = `Primary Energy Exports`,
+         `Stock Change` = `Primary Energy Stock Change and Other`,
+         `C:Fossil` = `Total Fossil Fuels Consumption`,
+         `C:Nuclear` = `Nuclear Electric Power Consumption`,
+         `C:Renew` = `Total Renewable Energy Consumption`,
+         `C:Primary` = `Total Primary Energy Consumption`,
+         `Net Imports` = `Primary Energy Net Imports`,
+         `C:Resid` = `Total Energy Consumed by the Residential Sector`,
+         `Elec:Resid` = `Electricity Sales to Ultimate Customers in the Residential Sector`,
+         `Loss:Resid` = `Residential Sector Electrical System Energy Losses`,
+         `C:Com` = `Total Energy Consumed by the Commercial Sector`,
+         `Elec:Com` = `Electricity Sales to Ultimate Customers in the Commercial Sector`,
+         `Loss:Com` = `Commercial Sector Electrical System Energy Losses`,
+         `C:Ind` = `Total Energy Consumed by the Industrial Sector`,
+         `Elec:Ind` = `Electricity Sales to Ultimate Customers in the Industrial Sector`,
+         `Loss:Ind` = `Industrial Sector Electrical System Energy Losses`,
+         `C:Tran` = `Total Energy Consumed by the Transportation Sector`,
+         `Elec:Tran` = `Electricity Sales to Ultimate Customers in the Transportation Sector`,
+         `Loss:Tran` = `Electrical System Energy Losses Proportioned to the Transportation Sector`,) %>%
+  select(where(is.numeric)) %>%
+  cor()
+
+corrplot(cor.input2, title = "Correlation between Energy Production and Consumption Trends", type = "upper", tl.col = "black", tl.cex = 0.7, mar = c(1, 1, 1, 1))
+```
+
+
+Based on the visual, we identified various variables with a strong positive relationship for each sector:
+
+*   Residential: *Year*, *Nuclear Electric Power Production*, *Total Renewable Energy Production*, *Primary Energy Imports*, *Primary Energy Stock Change and Other*, and *Total Fossil Fuels Consumption*
+
+*   Transportation: *Year*, *Nuclear Electric Power Production*, *Total Renewable Energy Production*, *Primary Energy Imports*, and *Total Fossil Fuels Consumption*
+
+*   Industrial:  *Year*, *Nuclear Electric Power Production*, *Primary Energy Imports*, and *Total Fossil Fuels Consumption*
+
+*   Commercial: *Year*, *Nuclear Electric Power Production*, *Total Renewable Energy Production*, *Primary Energy Imports*, *Primary Energy Stock Change and Other*, *Total Fossil Fuels Consumption*, and *Total Renewable Energy Consumption*
+
+Using the variables above, we used 20 folds to create a model for each sector to the same train (1973 - 2017) and test (2018 - 2019) data. With the train data’s model, we plotted predictions on the test data to determine its accuracy.
+
+
+```{r, include = F, warning = F}
+#creating cross-validated train and test datasets within the 1973-2018 data
+
+Resid.Train <- NewEnergy %>%
+  select(-contains("Transportation"),-contains("Industrial"), -contains("Commercial"))%>%
+  crossv_kfold(20)%>%
+  select(-.id)
+
+Trans.Train <- NewEnergy %>%
+  select(-contains("Residential"), -contains("Industrial"), -contains("Commerical"))%>%
+  crossv_kfold(20)%>%
+  select(-.id)
+
+Indus.Train <- NewEnergy %>%
+  select(-contains("Residential"), -contains("Transportation"), -contains("Commercial")) %>%
+  crossv_kfold(20) %>%
+  select(-.id)
+
+Com.Train <- NewEnergy %>%
+  select(-contains("Residential"), -contains("Transportation"), -contains("Industrial"))%>%
+  crossv_kfold(20)%>%
+  select(-.id)
+
+#creating functions to judge the effectiveness of the models we are about to create
+MAE.func = function(resids){
+  MAE = mean(abs(resids), na.rm = T)
+  return(MAE)
+}
+
+bias.func = function(residuals){
+  MSE = mean(residuals, na.rm = T)
+  return(MSE)
+}
+
+RMSE.func=function(residuals){
+  mse=mean((residuals)^2,na.rm=T)
+  rmse=sqrt(mse)
+  return(rmse)
+}
+
+#for each sector: creating a relevant linear function (based on correlation matrices) and getting predictions and residuals of the models on each dataset from 1973-2018 – THIS PART HAS CHANGED
+# used correlation plot to see the relevant variables to determining energy usage (nuclear electric power production were helpful )
+
+lmRes.func = function(data){
+  mod = lm(`Total Energy Consumed by the Residential Sector` ~ Year + `Nuclear Electric Power Production` + `Total Renewable Energy Production` +
+        `Primary Energy Imports` + `Primary Energy Stock Change and Other` +
+        `Total Fossil Fuels Consumption`,data=data)
+  return(mod)
+}
+
+ResMod <- Resid.Train %>%
+      mutate(tr.model=map(train,lmRes.func))
+
+ResMod.Predict <- ResMod %>%
+      mutate(predict=map2(test,tr.model,~augment(.y,newdata=.x))) %>%
+      select(predict) %>%
+      unnest()
+
+lmTrans.func = function(data) {
+  mod = lm(`Total Energy Consumed by the Transportation Sector`~ Year + `Nuclear Electric Power Production` + `Total Renewable Energy Production` + `Primary Energy Imports`+`Total Fossil Fuels Consumption`+`Total Renewable Energy Consumption`, data=data)
+}  
+
+TransMod <- Trans.Train %>%
+      mutate(tr.model=map(train,lmTrans.func))
+
+TransMod.Predict <- TransMod %>%
+      mutate(predict=map2(test,tr.model,~augment(.y,newdata=.x))) %>%
+      select(predict) %>%
+      unnest()
+
+lmInd.func = function(data) {
+  mod = lm(`Total Energy Consumed by the Industrial Sector`~ Year + `Nuclear Electric Power Production` + `Primary Energy Imports`+`Total Fossil Fuels Consumption`, data=data)
+}  
+
+IndMod <- Indus.Train %>%
+      mutate(tr.model=map(train,lmInd.func))
+
+IndMod.Predict <- IndMod %>%
+      mutate(predict=map2(test,tr.model,~augment(.y,newdata=.x))) %>%
+      select(predict) %>%
+      unnest()
+
+lmCom.func = function(data) {
+  mod = lm(`Total Energy Consumed by the Commercial Sector`~ Year + `Nuclear Electric Power Production` + `Total Renewable Energy Production` + `Primary Energy Imports`+ `Primary Energy Stock Change and Other` +`Total Fossil Fuels Consumption`+`Total Renewable Energy Consumption`, data=data)
+} 
+
+ComMod <- Com.Train %>%
+      mutate(tr.model=map(train,lmCom.func))
+
+ComMod.Predict <- ComMod %>%
+      mutate(predict=map2(test,tr.model,~augment(.y,newdata=.x))) %>%
+      select(predict) %>%
+      unnest()
+
+#creating a dataset with years 2020-2023 to test previous model predictions on
+
+Covid.Energy <- Energy %>%
+  filter(Year >= 2020)
+
+#rewriting the same linear functions used on the 1973-2018 data to apply them to the 2020-2023 data
+
+ResmodC = lm(`Total Energy Consumed by the Residential Sector` ~ Year + `Nuclear Electric Power Production` + `Total Renewable Energy Production` +
+        `Primary Energy Imports` + `Primary Energy Stock Change and Other` +
+        `Total Fossil Fuels Consumption`,data=NewEnergy)
+
+TransmodC = lm(`Total Energy Consumed by the Transportation Sector`~ Year + `Nuclear Electric Power Production` + `Total Renewable Energy Production` + `Primary Energy Imports`+ `Total Fossil Fuels Consumption`+`Total Renewable Energy Consumption`, data=NewEnergy)
+
+IndmodC = lm(`Total Energy Consumed by the Industrial Sector`~ Year + `Nuclear Electric Power Production` + `Primary Energy Imports`+`Total Fossil Fuels Consumption`, data=NewEnergy)
+
+CommodC = lm(`Total Energy Consumed by the Commercial Sector`~ Year + `Nuclear Electric Power Production` + `Total Renewable Energy Production` + `Primary Energy Imports`+ `Primary Energy Stock Change and Other` +`Total Fossil Fuels Consumption`+`Total Renewable Energy Consumption`, data=NewEnergy)
+
+#creating predictions and residuals for each sector based on the models used for 1973-2018, FOR the data from 2020-2023
+
+Resid.TestB <- Energy %>%
+  filter(Year>=2018 & Year <= 2019)%>%
+  select(-contains("Transportation"),-contains("Industrial"), -contains("Commercial"))%>%
+  add_predictions(ResmodC, var = "ResPredictB") %>%
+  add_residuals(ResmodC, var = "ResResidualsB")
+
+
+Trans.TestB <- Energy %>%
+  filter(Year>=2018 & Year <= 2019)%>%
+  select(-contains("Residential"), -contains("Industrial"), -contains("Commerical"))%>%
+  add_predictions(TransmodC, var = "TransPredictB") %>%
+  add_residuals(TransmodC, var = "TransResidualsB")
+
+
+Indus.TestB <- Energy %>%
+  filter(Year>=2018 & Year <= 2019) %>%
+  select(-contains("Residential"), -contains("Transportation"), -contains("Commercial")) %>%
+  add_predictions(IndmodC, var = "IndPredictB") %>%
+  add_residuals(IndmodC, var = "IndResidualsB")
+
+Com.TestB <- Energy %>%
+  filter(Year>=2018 & Year <= 2019) %>%
+  select(-contains("Residential"), -contains("Transportation"), -contains("Industrial"))%>%
+  add_predictions(CommodC, var = "ComPredictB") %>%
+  add_residuals(CommodC, var = "ComResidualsB")
+
+Resid.TestC <- Energy %>%
+  filter(Year>=2020)%>%
+  select(-contains("Transportation"),-contains("Industrial"), -contains("Commercial"))%>%
+  add_predictions(ResmodC, var = "ResPredict") %>%
+  add_residuals(ResmodC, var = "ResResiduals")
+
+Trans.TestC <- Energy %>%
+  filter(Year >= 2020)%>%
+  select(-contains("Residential"), -contains("Industrial"), -contains("Commerical"))%>%
+  add_predictions(TransmodC, var = "TransPredict") %>%
+  add_residuals(TransmodC, var = "TransResiduals")
+
+Indus.TestC <- Energy %>%
+  filter(Year >= 2020) %>%
+  select(-contains("Residential"), -contains("Transportation"), -contains("Commercial")) %>%
+  add_predictions(IndmodC, var = "IndPredict") %>%
+  add_residuals(IndmodC, var = "IndResiduals")
+
+Com.TestC <- Energy %>%
+  filter(Year >= 2020) %>%
+  select(-contains("Residential"), -contains("Transportation"), -contains("Industrial"))%>%
+  add_predictions(CommodC, var = "ComPredict") %>%
+  add_residuals(CommodC, var = "ComResiduals")
+
+#creating a table to display my findings – testing MSE, MAE, RMSE
+
+Metrics <- data.frame(Model = c("Residential", "Transportation", "Industrial", "Commercial"), `MAE (-2017)`= c(MAE.func(ResMod.Predict$.resid), MAE.func(TransMod.Predict$.resid), MAE.func(IndMod.Predict$.resid), MAE.func(ComMod.Predict$.resid)), `MAE (2018-2019)` = c(MAE.func(Resid.TestB$ResResidualsB), MAE.func(Trans.TestB$TransResidualsB), MAE.func(Indus.TestB$IndResidualsB), MAE.func(Com.TestB$ComResidualsB)),`MAE (2020-)` = c(MAE.func(Resid.TestC$ResResiduals), MAE.func(Trans.TestC$TransResiduals), MAE.func(Indus.TestC$IndResiduals), MAE.func(Com.TestC$ComResiduals)), `Bias (-2017)` = c(bias.func(ResMod.Predict$.resid), bias.func(TransMod.Predict$.resid), bias.func(IndMod.Predict$.resid), bias.func(ComMod.Predict$.resid)), `Bias (2018-2019)` = c(bias.func(Resid.TestB$ResResidualsB), bias.func(Trans.TestB$TransResidualsB), bias.func(Indus.TestB$IndResidualsB), bias.func(Com.TestB$ComResidualsB)),`Bias (2020-)` = c(bias.func(Resid.TestC$ResResiduals), bias.func(Trans.TestC$TransResiduals), bias.func(Indus.TestC$IndResiduals), bias.func(Com.TestC$ComResiduals)), `RMSE (-2017)` = c(RMSE.func(ResMod.Predict$.resid), RMSE.func(TransMod.Predict$.resid), RMSE.func(IndMod.Predict$.resid), RMSE.func(ComMod.Predict$.resid)),`RMSE (2018-2019)` = c(RMSE.func(Resid.TestB$ResResidualsB), RMSE.func(Trans.TestB$TransResidualsB), RMSE.func(Indus.TestB$IndResidualsB), RMSE.func(Com.TestB$ComResidualsB)), `RMSE (2020-)` = c(RMSE.func(Resid.TestC$ResResiduals), RMSE.func(Trans.TestC$TransResiduals), RMSE.func(Indus.TestC$IndResiduals), RMSE.func(Com.TestC$ComResiduals)))
+
+colnames(Metrics) <- c("Sector", "MAE (-2017)", "MAE (2018-2019)", "MAE (2020-)", "MSE (-2017)", "MSE (2018-2019)", "MSE (2020-)", "RMSE (-2017)", "RMSE (2018-2019)","RMSE (2020-)")
+```
+
+```{r, echo = F, warning = F}
+Metrics %>%
+  kbl(caption = "K-Fold Cross Validation Model for Q1", "html") %>%
+  kable_paper("hover")
+```
+
+
+The *MAE*, *MSE*, and *RMSE* based on the k-folds generally have more accurate predictions for pre-pandemic years than our first linear model. With this, we can give more weight and credit to this model for answering our question. The *Industrial* sector had the largest errors, and the *Commercial* sector had the smallest errors. Comparing the biases from 1973 to 2017, 2018 to 2019, and 2020 and beyond, we can see the error progressively increasing, peaking at COVID-19. Thus, for post-pandemic years, the k-fold model is generally less accurate. This difference in *MAE*, *MSE*, and *RMSE* helps us conclude that past economic trends aren’t relevant in directly affecting energy usage changes during the pandemic. Considering the uniqueness of COVID-19, we assume that the relatively higher errors come from the abruptness of the event without prior signals that hint at an upcoming recession. 
+
+
+## Question 2: Do we expect the US to become a net energy exporter or importer in the following years?
+
+For further exploration after building the scatterplot of energy imports and exports, we created a correlation plot to get a sense of what relationships we should be looking for when answering our question. We followed the same format of naming the variables as the correlation plot in Q1. We separated the *Year* and *Month* variables as we noticed an obvious shift in net export status over time, so we wanted to incorporate the two variables into numeric calculations. As the visual below shows, *Year* had a strong negative relationship with *Imports* and a strong positive relationship with *Exports*. The changes in *Total Renewable Energy Production* and *Total Renewable Energy Consumption* were also notable in the strong relationships with *Imports* and *Exports*. Despite the weaker relationships with the other variables, we decided to include the other variables as they have some sort of relationship, which could act as explanatory variables.
+
+```{r, echo = F}
+PrimaryEnergyOverview2 = PrimaryEnergyOverview %>%
+  separate(Month, into = c("Year", "Month"), sep = " ") %>%
+  group_by(Year) %>%
+  mutate_at(1, as.numeric)
+
+Q2 <- PrimaryEnergyOverview2 %>%
+  ungroup() %>%
+  filter(Year >= 2000) %>%
+  mutate(`Primary Energy Net Exports` = `Primary Energy Exports` - `Primary Energy Imports`) %>%
+  mutate(correlate = cor(`Primary Energy Imports`, `Primary Energy Exports`)) %>%
+  rename(`P:Nuclear` = `Nuclear Electric Power Production`,
+         `P:Primary` = `Total Primary Energy Production`,
+         `P:Fossil` = `Total Fossil Fuels Production`,
+         `P:Renew` = `Total Renewable Energy Production`,
+         `Imports` = `Primary Energy Imports`,
+         `Exports` = `Primary Energy Exports`,
+         `Stock Change` = `Primary Energy Stock Change and Other`,
+         `C:Fossil` = `Total Fossil Fuels Consumption`,
+         `C:Nuclear` = `Nuclear Electric Power Consumption`,
+         `C:Renew` = `Total Renewable Energy Consumption`,
+         `C:Primary` = `Total Primary Energy Consumption`,
+         `Net Exports` = `Primary Energy Net Exports`,
+         `Net Imports` = `Primary Energy Net Imports`)
+
+cor.input <- Q2 %>%
+  select(where(is.numeric)) %>%
+  select(-c(correlate)) %>%
+  cor()
+
+corrplot(cor.input, title = "Correlation between Energy with Imports and Exports", type = "upper", tl.col = "black", tl.cex = 0.5, mar = c(1, 1, 1, 1))
+
+# glm(correlate ~ `C:Renew` + `C:Fossil`+ `Imports`+ `Exports`+ `P:Renew` + `P:Fossil` + `Year`, data = Q2)
+```
+
+
+To work with models, we built a new table that numerically identifies the *Year* and *Month* values. Through a for() loop, we marked each month as 1/12 of a year, which adds the decimal value to the *Year* variable. We then separated the dataset so every observation before 2022 was used to train our model, and every observation in 2022 and after was used to test it. In order to create our model, we also had to remove some columns that created singularities in the model. This means that some of the variables we tested have a perfect linear relationship, so they are not included in the prediction. *Month* was also removed as it wasn’t a numeric variable that we could make calculations with.
+
+
+```{r, include = F}
+# Preparing the dataset
+SellDiff <- PrimaryEnergyOverview %>%
+  separate(Month, into = c("Year", "Month"), sep = " ") %>%
+    mutate(`Primary Energy Net Exports` = `Primary Energy Exports` - `Primary Energy Imports`) %>%
+  group_by(Year) %>%
+  mutate_at(1, as.numeric) %>%
+         mutate_at(1, as.character) %>%
+  filter(Year >= 2000) %>%
+  ungroup()
+SellDiff$Year <- as.numeric(SellDiff$Year)
+# Make the "Year" variable include the month in the decimal places
+for (i in 1:nrow(SellDiff)) {
+  SellDiff[i,1] <- SellDiff[i,1] + ((i - 1) %% 12)/12
+}
+```
+
+
+```{r, include = F}
+# For a logistic model
+SellDiff2 <- SellDiff %>%
+  mutate(Importer=ifelse(`Primary Energy Net Exports`>0,1,0))
+# Including only the relevant variables
+
+SellDiff3 <- select(SellDiff2, -c(`Month`, `Total Primary Energy Production`, `Primary Energy Imports`, `Primary Energy Exports`, `Total Primary Energy Consumption`, `Importer`, `Nuclear Electric Power Consumption`))
+Diff.train <- filter(SellDiff3, Year < 2022)
+Diff.test <- filter(SellDiff3, Year >= 2022)
+
+Expectations = data.frame(Year = 2024, `Total Fossil Fuels Production` = 7070, `Nuclear Electric Power Production` = 722, `Total Renewable Energy Production` = 686, `Primary Energy Net Imports` = -656, `Primary Energy Stock Change and Other` = 1151, `Total Fossel Fuels Consumption` = 7584, `Total Renewable Energy Production` = 662, `Primary Energy Net Exports` = 656)
+
+colnames(Expectations) = c("Year", "Total Fossil Fuels Production", "Nuclear Electric Power Production", "Total Renewable Energy Production", "Primary Energy Net Imports", "Primary Energy Stock Change and Other", "Total Fossil Fuels Consumption", "Total Renewable Energy Consumption", "Primary Energy Net Exports")
+
+Diff.final = rbind(Diff.test, Expectations)
+
+# Making a model
+Netmod <- lm(`Primary Energy Net Exports`~., data = Diff.train)
+# summary(Netmod)
+
+Prediction <- data.frame(y =predict.lm(Netmod, Diff.final))
+Prediction <- mutate(Prediction, Year = Diff.final$Year)
+```
+
+
+```{r, echo = F}
+Diff.train %>%
+  head() %>%
+  kbl(caption = "Train Data for Q2", "html") %>%
+  kable_paper("hover")
+```
+
+To predict the US’ status as a net importer or exporter in the future, we further investigated [data from EIA](https://www.eia.gov/totalenergy/data/monthly/pdf/sec1.pdf) to find data after November of 2023, the last observation in our dataset. We were able to find the respective data for the variables in our model for January 2024. We, thus, added the values to the table above to plot predictions. Our model was extremely accurate in predicting energy consumption in 2022 onwards. We plotted the actual data until November 2023 as a line graph for the actual net export values. The black points represents the predicted *Primary Energy Net Exports* in trillion BTU from 2022 until 2024, based on the model on observations up until 2021. When focusing on the 2024 data, EIA measures *Primary Energy Net Exports* as 656 Trillion BTU, and our model estimated 656.0002 Trillion BTU, which brings us to conclude the model is accurate. 
+
+
+```{r, echo = F}
+# Plotting the overall data and comparing it to the predictions
+ggplot() +
+  geom_point(data = Prediction, mapping = aes(Year, y)) +
+  geom_line(mapping = aes(x = Year, y =`Primary Energy Net Exports`), color = "red", data = SellDiff3) + 
+  labs(y = "Net Export (Trillion BTU)",
+       title = "Net Export of the US Over Time")
+```
+
+To measure the accuracy, we built a table that records the *MAE*, *MSE*, and *RMSE* of the predicted data (2022 and onward). All three variables display an extremely low bias, further supporting the strength of our model. 
+
+```{r, echo = F}
+biascomparison = cbind(Prediction[,2], Diff.final[,9], Prediction[,1])
+
+colnames(biascomparison) = c("Year", "Primary Energy Net Exports", "Prediction")
+
+biascomparison %>%
+  mutate(Residual = `Primary Energy Net Exports` - Prediction,
+         MAE = mean(abs(Residual), na.rm = T),
+            MSE = mean(Residual, na.rm = T), 
+            RMSE = sqrt(mean(Residual^2, na.rm = T))) %>%
+  select(MAE, MSE, RMSE) %>%
+  slice(1) %>%
+  kbl(caption = "Biases for Q2 Model", "html") %>%
+  kable_paper("hover")
+```
+
+With the accuracy of our model supported by the low biases, we can initially conclude that the predicted value for 2024 is legitimate. By the positive *Primary Energy Net Exports* value predicted by our model, we can further expect the US to settle as a net energy exporter. 
+
+
+# CONCLUSION
+
+In our first question, we were not surprised that the biases (MAE, MSE, RMSE) were higher for COVID-19 than the test or train data. COVID-19 was a very sudden event without much precedence, so we did not expect the model to be very accurate. Thus, it is not a surprise that past economic trends did not affect energy consumption trends during the pandemic. Because of the suddenness of COVID, we do not think that different methods of modeling would help us build a better model either. However, this prepares us for how future recessions will unexpectedly and varyingly affect the economy and energy usage. 
+
+In our second question, we were surprised by our model’s accuracy. Our model was very accurate when predicting energy import and export trends in 2022 through 2024. Our model’s accuracy could be attributed to the consistent downward trend of the difference between imports and exports. This makes sense when compared to the more unpredictable trends we analyzed in the first question. Because our model was accurate with its predictions, we do not think that another model is necessary. 
+
+For data analysts interested in exploring these questions further, it may be useful to consider other datasets. For example, using global economic data in conjunction with energy data could create a more accurate model for our first question. Another data can be behavioral responses on certain recessions that can explain why energy usage in each sector would increase or decrease. The second question might be interesting when examined with foreign policy data. For example, discovering what kind of effects oil sanctions have on US energy trade could be useful. During periods of economic stability, policymakers and economists may be interested in a more accurate model for predicting energy trends. However, in times of instability, the results of the first question reveal that it may be difficult to create a model that can predict the effects of economic recessions. Examining when energy or pollution laws were enacted could help lawmakers see how their decisions affect energy industries. Additionally, predictive models could be built to anticipate the effects of policy enactments.

@@ -1,0 +1,43 @@
+---
+title: "Project Proposal"
+author: "STOR 320.01 Group 2"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Project Roles
+
+- **Creator:** Eiona Engwall
+- **Interpreter:** Kurt Matteson
+- **Orator 1:** William Hayward
+- **Orator 2:** Deeya Pathak
+- **Deliverer:** Jennifer Kwon
+
+# Dataset
+
+[PRIMARY ENERGY OVERVIEW](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T01.01#/?f=M&start=200001)
+
+[PRIMARY ENERGY CONSUMPTION BY SOURCE](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T01.03#/?f=M)
+
+[ENERGY CONSUMPTION: RESIDENTIAL, COMMERCIAL, AND INDUSTRIAL SECTORS](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T02.01A#/?f=M&start=200001)
+
+[ENERGY CONSUMPTION: TRANSPORTATION SECTOR, TOTAL END-USE SECTORS, AND ELECTRIC POWER SECTOR](https://www.eia.gov/totalenergy/data/browser/index.php?tbl=T02.01B#/?f=M&start=200001)
+
+
+# Initial Questions
+
+- **Question 1:** Which sector has the highest total energy consumption? For each sector, what type of energy is responsible for the majority of its consumption? 
+- **Question 2:** How does energy consumption by source change by season? Is this effect, or lack thereof, consistent across all types of sources and years?
+- **Question 3:** Do certain changes in energy consumption hint at a possibility of economic recessions? Is this effect, or lack thereof, consistent across the sectors? How are some sectors more or less affected by the assumed periods of economic recessions?
+- **Question 4:** Is there an increase in the consumption of renewable energy sources? How does this compare to the increasing or decreasing consumption of nonrenewable forms of energy? Are renewable energy forms used immediately and steadily or on and off during the inception of nonrenewable forms of energy?
+- **Question 5:** Which sectors have the largest difference between primary and end-use energy consumption annually? How do they compare with each other? Are there relationships between sectors for these energy differences?
+- **Question 6:** What proportions of energy consumption are energy loss across each sector? What changes do the proportions go through over time? Which sector reports the largest change in energy loss? Does this vary by the time of the year?
+- **Question 7:** Is there a pattern between the change in electrical system energy losses and the appearance of renewable energy forms? Are nonrenewable or renewable energy sources better at converting energy losses and providing more electricity? 
+- **Question 8:** How do the commercial and industrial sectors differ or align in energy consumption over time? Do they have a positive, negative, or neutral relationship? Is there a pattern in how one affects the other?
+- **Question 9:** Is there a relationship between primary energy imports and exports? If so, is it positive, negative, or neutral? How strong is the correlation?
+- **Question 10:** Which producer has reduced emissions by nonrenewable energy sources the most over the period? Do the sectors follow a similar increasing or decreasing trend in their overall energy consumption? How strong is the relationship between changes in nonrenewable energy sources and energy consumption?

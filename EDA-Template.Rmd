@@ -1,0 +1,730 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.01 Group 2"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(kableExtra)
+library(leaps)
+```
+
+# Import Data into R
+The deleted rows are excess space that includes the details of the data sets without observations.
+```{r}
+PrimaryEnergyOverview = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Primary_Energy_Overview.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+PrimaryEnergyBySource = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Primary_Energy_Consumption_by_Source.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+EnergyConsumptionA = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Energy_ConsumptionA.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+EnergyConsumptionB = read_csv("C:\\Users\\jenny\\OneDrive\\문서\\STOR320Project\\Energy_ConsumptionB.csv") %>%
+  .[-c(1,2,3,4,5,6,7,8,9,10,11), ]
+```
+
+# Rename Column Names
+```{r}
+colnames(PrimaryEnergyOverview) <- c("Month",	"Total Fossil Fuels Production","Nuclear Electric Power Production", "Total Renewable Energy Production",	"Total Primary Energy Production",	"Primary Energy Imports", "Primary Energy Exports",	"Primary Energy Net Imports",	"Primary Energy Stock Change and Other",	"Total Fossil Fuels Consumption",	"Nuclear Electric Power Consumption",	"Total Renewable Energy Consumption",	"Total Primary Energy Consumption")
+
+colnames(PrimaryEnergyBySource) <- c("Month",	"Coal Consumption",	"Natural Gas Consumption (Excluding Supplemental Gaseous Fuels)",	"Petroleum Consumption (Excluding Biofuels)",	"Total Fossil Fuels Consumption",	"Nuclear Electric Power Consumption",	"Hydroelectric Power Consumption",	"Geothermal Energy Consumption",	"Solar Energy Consumption",	"Wind Energy Consumption",	"Biomass Energy Consumption",	"Total Renewable Energy Consumption",	"Total Primary Energy Consumption")
+
+colnames(EnergyConsumptionA) <- c("Month",	"Primary Energy Consumed by the Residential Sector",	"Electricity Sales to Ultimate Customers in the Residential Sector",	"End-Use Energy Consumed by the Residential Sector",	"Residential Sector Electrical System Energy Losses",	"Total Energy Consumed by the Residential Sector",	"Primary Energy Consumed by the Commercial Sector",	"Electricity Sales to Ultimate Customers in the Commercial Sector",	"End-Use Energy Consumed by the Commercial Sector",	"Commercial Sector Electrical System Energy Losses",	"Total Energy Consumed by the Commercial Sector",	"Primary Energy Consumed by the Industrial Sector",	"Electricity Sales to Ultimate Customers in the Industrial Sector",	"End-Use Energy Consumed by the Industrial Sector",	"Industrial Sector Electrical System Energy Losses",	"Total Energy Consumed by the Industrial Sector")
+
+colnames(EnergyConsumptionB) <- c("Month",	"Total Primary Energy Consumed by the Transportation Sector",	"Electricity Sales to Ultimate Customers in the Transportation Sector",	"End-Use Energy Consumed by the Transportation Sector",	"Electrical System Energy Losses Proportioned to the Transportation Sector",	"Total Energy Consumed by the Transportation Sector",	"Total Primary Energy Consumed by the End-Use Sectors",	"Electricity Sales to Ultimate Customers in the End-Use Sectors",	"End-Use Energy Consumed by the End-Use Sectors",	"Total Electrical Energy System Losses Proportioned to the End-Use Sectors",	"Total Energy Consumed by the End-Use-Sectors",	"Primary Energy Consumed by the Electric Power Sector",	"Primary Energy Consumption Total")
+```
+
+# Convert Observations to numerical variables
+```{r}
+PrimaryEnergyOverview = PrimaryEnergyOverview %>%
+  mutate_at(2:13, as.numeric)
+
+PrimaryEnergyBySource = PrimaryEnergyBySource %>%
+  mutate_at(2:13, as.numeric)
+
+EnergyConsumptionA = EnergyConsumptionA %>%
+  mutate_at(2:16, as.numeric)
+
+EnergyConsumptionB = EnergyConsumptionB %>%
+  mutate_at(2:13, as.numeric)
+```
+
+# Create Function to Convert Units
+```{r}
+tri_convert = function(vector){
+  y = vector * 1000
+return(y)}
+```
+
+```{r}
+PrimaryEnergyOverview = PrimaryEnergyOverview %>%
+  mutate_at(2:13, tri_convert)
+
+PrimaryEnergyBySource = PrimaryEnergyBySource %>%
+  mutate_at(2:13, tri_convert)
+```
+
+# Join Datasets
+```{r}
+EnergyConsumption = full_join(EnergyConsumptionA, EnergyConsumptionB, by = "Month")
+Energy = full_join(PrimaryEnergyOverview, EnergyConsumption, by = "Month")
+```
+
+# Tidy Dataset
+```{r}
+Energy = Energy %>%
+  separate(Month,
+           into = c("Year", "Month"), 
+           sep = " ") %>%
+  mutate_at(1, as.numeric)
+```
+
+# Creator: Eiona Engwall
+
+### Q1: Is there an increase in the consumption of renewable energy sources? How does this compare to the increasing or decreasing consumption of nonrenewable forms of energy? Are renewable energy forms used immediately and steadily or on and off during the inception of renewable forms of energy?
+
+Important to note: nuclear electric power production and consumption are not included in this analysis and accounts for the gap in total primary energy production (it is additive). 
+
+According to the following analyses, nonrenewable energy sources increased much more in consumption from 1973 to 2023. Aside from some interesting patterns in the early 1980s and 2000s, fossil fuel consumption has steadily increased while renewable energy consumption has only slightly increased. From the linear regression analyses, each year between 1973 and 2023 saw a increase of about 97 British thermal units (BTUs) in renewable energy consumption and an approximate increase of 286 BTUs for fossil fuel consumption. Additionally, for every 1 BTU more of fossil fuel consumption, renewable energy consumption only increased by 0.089 BTUs. During the early 2000s, it seems that nonrenewable energy consumption starts to decrease, while renewable energy consumption starts to increase.
+
+```{r}
+#putting the data in yearly form
+
+Q1_EE <- Energy %>%
+  select("Year", "Month", "Total Renewable Energy Production", "Total Fossil Fuels Production", "Total Primary Energy Production", "Total Renewable Energy Consumption", "Total Fossil Fuels Consumption", "Primary Energy Consumption Total") %>% 
+  rename("Renewable Energy Production" = "Total Renewable Energy Production", "Fossil Fuels Production" = "Total Fossil Fuels Production", "Primary Energy Production" = "Total Primary Energy Production", "Renewable Energy Consumption" = "Total Renewable Energy Consumption", "Fossil Fuels Consumption" = "Total Fossil Fuels Consumption", "Primary Energy Consumption" = "Primary Energy Consumption Total")
+
+Q1_year <- Q1_EE %>%
+  mutate(Year = as.numeric(Year)) %>%
+  group_by(Year) %>%
+  summarize(`Renewable Energy Consumption by Year` = sum(`Renewable Energy Consumption`), `Fossil Fuels Consumption by Year` = sum(`Fossil Fuels Consumption`), `Primary Energy Consumption by Year` = sum(`Primary Energy Consumption`)) %>% ungroup()
+
+#making a gathered form for summation statistics
+
+Q1_EE_gather <- Q1_EE %>% 
+  gather(3:5, key = "Production Type", value = "Trillion Btu Production") %>% 
+  gather(3:5, key = "Consumption Type", value = "Trillion Btu Consumption") 
+
+#creating summary statistics for energy consumption
+
+Q1_EE_gather %>% group_by(`Consumption Type`) %>% 
+  summarize(Count = n(), Minimum = min(`Trillion Btu Consumption`, na.rm = T), Maximum = max(`Trillion Btu Consumption`), Mean = mean(`Trillion Btu Consumption`, na.rm = T)) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  kbl(caption = "Summary Statistics for Energy Consumption Type", "html") %>% 
+  kable_material_dark() 
+
+#linear regression for energy consumption types
+
+renewreg = lm(`Renewable Energy Consumption by Year` ~ Year, data = Q1_year)
+plot(`Renewable Energy Consumption by Year` ~ Year, data = Q1_year)
+abline(renewreg)
+
+nonrenewreg = lm(`Fossil Fuels Consumption by Year` ~ Year, data = Q1_year)
+plot(`Fossil Fuels Consumption by Year` ~ Year, data = Q1_year)
+abline(nonrenewreg)
+
+assocreg = lm(`Renewable Energy Consumption by Year` ~ `Fossil Fuels Consumption by Year`, data = Q1_year)
+plot(`Renewable Energy Consumption by Year` ~ `Fossil Fuels Consumption by Year`, data = Q1_year)
+abline(assocreg)
+
+#combining linear regressions into a table
+
+data.frame(Model = c("Renewable Energy Consumption and Year", "Fossil Fuels Consumption and Year", "Renewable Energy and Fossil Fuels Consumption"), Coefficient = c(summary(renewreg)$coefficients[2,1], summary(nonrenewreg)$coefficients[2,1], summary(assocreg)$coefficients[2,1]), t_value = c(summary(renewreg)$coefficients[2,3], summary(nonrenewreg)$coefficients[2,3], summary(assocreg)$coefficients[2,3]), p_value = c(summary(renewreg)$coefficients[2,4],  summary(nonrenewreg)$coefficients[2,4], summary(assocreg)$coefficients[2,4])) %>%
+  kbl(caption = "Summary Statistics for Energy Consumption Linear Regression Models", "html") %>%
+  kable_material_dark()
+
+#overall graph depicting Energy Consumption by Year
+
+colors1 = c("Renewable" = "orange", "Fossil Fuels" = "black")
+
+Q1_year %>% 
+  ggplot(aes(x=Year)) + 
+  geom_line(aes(y=`Renewable Energy Consumption by Year`, color = "Renewable")) + 
+  geom_line(aes(y=`Fossil Fuels Consumption by Year`, color = "Fossil Fuels")) +
+  scale_x_continuous(breaks = seq(min(Q1_EE$Year), max(Q1_EE$Year), by = 5)) +
+  scale_color_manual(name = "Energy Source", values = colors1) +
+  ylab("Energy Consumption by Year") +
+  labs(title = "Energy Consumption by Source and Year")
+```
+
+### Q2: Is there a pattern between the change in electrical system energy losses and the appearance of renewable energy forms? Are nonrenewable or renewable energy sources better at converting energy losses and providing more electricity?
+
+Note: the stepwise model used is extremely basic and only used to create a multiple regression describing electrical losses. Further analyses would cross validate and test the model at length, as it has confusing and potentially contradictory output. 
+
+Interestingly, electrical system energy losses started to decline in the early 2000s, around the same time that renewable energy consumption and production experienced an uptick. As provided by the stepwise linear regression model, the best predictors of the variable of electrical system energy losses are Nuclear Energy Consumption (but not Production), Fossil Fuels Production and Consumption, and Renewable Energy Production and Consumption (though weakly, with larger p-values). The fact that Nuclear Energy Production is not included is interesting, as the report from eia.gov states that Nuclear Energy as a whole was a larger sink for electrical energy. Additionally, there seem to be contradictory patterns with the coefficients of this model: Renewable Consumption increases electrical losses, while Renewable Production does not, this trend is the same for Fossil Fuel Production and Consumption, but to a lesser degree. This may be due to their use in a larger model, but it is clear that both renewable energy and nuclear energy have strong impacts on electrical losses, though this may be better modeled in a non-linear regression. For individual linear analyses, both nuclear and renewable energy production and consumption had positive correlations with electrical losses, with an additional unit of nuclear electric power corresponding to a 1.6 BTU increase in electrical losses (1.03 for renewable energy production).
+
+
+```{r}
+#selecting desired data from Energy and summarizing by Year
+
+Q2_year <- Energy %>%
+  select("Year", "Total Fossil Fuels Production", "Nuclear Electric Power Production", "Total Renewable Energy Production", "Total Fossil Fuels Consumption", "Nuclear Electric Power Consumption", "Total Renewable Energy Consumption", "Total Electrical Energy System Losses Proportioned to the End-Use Sectors") %>%
+  mutate(Year = as.numeric(Year)) %>%
+  group_by(Year) %>%
+  summarize(`Renewable Energy Consumption by Year` = sum(`Total Renewable Energy Consumption`), `Fossil Fuels Consumption by Year` = sum(`Total Fossil Fuels Consumption`), `Nuclear Electric Power Consumption by Year` = sum(`Nuclear Electric Power Consumption`), `Renewable Energy Production by Year` = sum(`Total Renewable Energy Production`), `Fossil Fuels Production by Year` = sum(`Total Fossil Fuels Production`), `Nuclear Electric Power Production by Year` = sum(`Nuclear Electric Power Production`), `Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` = sum(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors`)) %>% ungroup()
+
+#linear regressions
+
+mod1 = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ Year, data = Q2_year)
+plot(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ Year, data = Q2_year)
+abline(mod1)
+
+mod2c = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ `Renewable Energy Consumption by Year`, data = Q2_year)
+  
+mod3c = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ `Fossil Fuels Consumption by Year`, data = Q2_year)
+
+mod4c = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ `Nuclear Electric Power Consumption by Year`, data = Q2_year)
+
+mod2p = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ `Renewable Energy Production by Year`, data = Q2_year)
+  
+mod3p = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ `Fossil Fuels Production by Year`, data = Q2_year)
+
+mod4p = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ `Nuclear Electric Power Production by Year`, data = Q2_year)
+
+
+#combining linear regressions into a table
+
+data.frame(Model = c("Electrical Energy System Losses and Year", "Electrical Losses and Renewable Energy Consumption", "Electrical Losses and Fossil Fuels Consumption", "Electrical Losses and Nuclear Electric Power Consumption"), Coefficient = c(summary(mod1)$coefficients[2,1], summary(mod2c)$coefficients[2,1], summary(mod3c)$coefficients[2,1], summary(mod4c)$coefficients[2,1]), t_value = c(summary(mod1)$coefficients[2,3], summary(mod2c)$coefficients[2,3], summary(mod3c)$coefficients[2,3], summary(mod4c)$coefficients[2,3]), p_value = c(summary(mod1)$coefficients[2,4],  summary(mod2c)$coefficients[2,4], summary(mod3c)$coefficients[2,4], summary(mod4c)$coefficients[2,4])) %>%
+  kbl(caption = "Summary Statistics for Energy Consumption and Electrical Loss Linear Regression Models", "html") %>%
+  kable_material_dark()
+
+data.frame(Model = c("Electrical Energy System Losses and Year", "Electrical Losses and Renewable Energy Production", "Electrical Losses and Fossil Fuels Production", "Electrical Losses and Nuclear Electric Power Production"), Coefficient = c(summary(mod1)$coefficients[2,1], summary(mod2p)$coefficients[2,1], summary(mod3p)$coefficients[2,1], summary(mod4p)$coefficients[2,1]), t_value = c(summary(mod1)$coefficients[2,3], summary(mod2p)$coefficients[2,3], summary(mod3p)$coefficients[2,3], summary(mod4p)$coefficients[2,3]), p_value = c(summary(mod1)$coefficients[2,4],  summary(mod2p)$coefficients[2,4], summary(mod3p)$coefficients[2,4], summary(mod4p)$coefficients[2,4])) %>%
+  kbl(caption = "Summary Statistics for Energy Production and Electrical Loss Linear Regression Models", "html") %>%
+  kable_material_dark()
+
+#Basic Model Analysis
+
+FullModel = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year`~., data = Q2_year)
+
+MSE = (summary(FullModel)$sigma)^2
+
+NoModel = lm(`Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year`~1, data = Q2_year)
+
+summary(step(NoModel, scope = list(upper=FullModel), scale = MSE))
+
+#Best Model with Table
+
+BestModel = lm(formula = `Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year` ~ 
+    `Nuclear Electric Power Consumption by Year` + `Fossil Fuels Production by Year` + 
+        `Fossil Fuels Consumption by Year` + `Renewable Energy Consumption by Year` + 
+        `Renewable Energy Production by Year`, data = Q2_year)
+
+data.frame(Model = c("Nuclear Electric Power Consumption", "Fossil Fuels Production", "Fossil Fuels Consumption", "Renewable Energy Consumption", "Renewable Energy Production"), Coefficient = c(summary(BestModel)$coefficients[2,1], summary(BestModel)$coefficients[3,1], summary(BestModel)$coefficients[4,1], summary(BestModel)$coefficients[5,1], summary(BestModel)$coefficients[6,1]), t_value = c(summary(BestModel)$coefficients[2,3], summary(BestModel)$coefficients[3,3], summary(BestModel)$coefficients[4,3], summary(BestModel)$coefficients[5,3], summary(BestModel)$coefficients[6,3]), p_value = c(summary(BestModel)$coefficients[2,4],  summary(BestModel)$coefficients[3,4], summary(BestModel)$coefficients[4,4], summary(BestModel)$coefficients[5,4], summary(BestModel)$coefficients[6,4])) %>%
+  kbl(caption = "Summary Statistics for Electrical Loss Linear Regression Model with Highest Explanatory Power", "html") %>%
+  kable_material_dark()
+
+#overall graphs depicting all trends
+
+colors2 = c("Renewable" = "orange", "Fossil Fuels" = "black", "Nuclear Electric Power" = "red", "Electrical Loss" = "yellow")
+
+Q2_year %>% 
+  ggplot(aes(x=Year)) + 
+  geom_line(aes(y=`Renewable Energy Consumption by Year`, color = "Renewable")) + 
+  geom_line(aes(y=`Fossil Fuels Consumption by Year`, color = "Fossil Fuels")) +
+  geom_line(aes(y = `Nuclear Electric Power Consumption by Year`, color = "Nuclear Electric Power")) +
+  geom_line(aes(y = `Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year`, color = "Electrical Loss")) +
+  scale_x_continuous(breaks = seq(min(Q2_year$Year), max(Q2_year$Year), by = 5)) +
+  scale_color_manual(name = "Energy", values = colors2) +
+  ylab("Energy Consumption and Electrical Losses by Year") +
+  labs(title = "Energy Consumption by Source, Loss, and Year")
+
+Q2_year %>% 
+  ggplot(aes(x=Year)) + 
+  geom_line(aes(y=`Renewable Energy Production by Year`, color = "Renewable")) + 
+  geom_line(aes(y=`Fossil Fuels Production by Year`, color = "Fossil Fuels")) +
+  geom_line(aes(y = `Nuclear Electric Power Production by Year`, color = "Nuclear Electric Power")) +
+  geom_line(aes(y = `Total Electrical Energy System Losses Proportioned to the End-Use Sectors by Year`, color = "Electrical Loss")) +
+  scale_x_continuous(breaks = seq(min(Q2_year$Year), max(Q2_year$Year), by = 5)) +
+  scale_color_manual(name = "Energy", values = colors2) +
+  ylab("Energy Production and Electrical Losses by Year") +
+  labs(title = "Energy Production by Source, Loss, and Year")
+```
+
+
+# Interpreter: Kurt Matteson
+
+### Q1: How do the commercial and industrial sectors differ or align in energy consumption over time? Do they have a positive, negative, or neutral relationship? Is there a pattern in how one affects the other?
+
+```{r}
+graph_2a <- Energy %>%
+  select(`Total Energy Consumed by the Commercial Sector`, `Total Energy Consumed by the Industrial Sector`, Year) %>%
+  gather(`Total Energy Consumed by the Commercial Sector`:`Total Energy Consumed by the Industrial Sector`, key = "Sector Type", value = "Value")
+ggplot(graph_2a, mapping = aes(x= Year, y = Value, color = `Sector Type`)) +
+  geom_line()
+```
+
+The industrial sector far outstrips the commercial sector. Both of them rose in consumption as the years passed, and any relationship between the two is positive at first, but gets negative as time passes. There is no discernible pattern in how one would affect the other.
+
+### Q2: What proportion of the total energy consumption across each sector is primary consumption? Is there a relationship between the sector and the main type of energy consumption it has? How do these things change over the years?
+
+```{r}
+# Works with group data
+ConsumptionAYearly <- EnergyConsumptionA
+for (a in 1:50){
+  ConsumptionAYearly[611+a,1] = paste(as.character(1972+a), "Total", sep = " ")
+}
+for (b in 2:16){
+  for (c in 1:50){
+    ConsumptionAYearly[611+c,b] = sum(EnergyConsumptionA[((12*c-11):(12*c)),b])
+  }
+}
+Question <- data.frame(
+  "Year" = ConsumptionAYearly$Month[612:661],
+  "Residential Proportion" = ConsumptionAYearly$`Primary Energy Consumed by the Residential Sector`[612:661] / ConsumptionAYearly$`Total Energy Consumed by the Residential Sector`[612:661],
+  "Commercial Proportion" = ConsumptionAYearly$`Primary Energy Consumed by the Commercial Sector`[612:661] / ConsumptionAYearly$`Total Energy Consumed by the Commercial Sector`[612:661],
+  "Industrial Proportion" = ConsumptionAYearly$`Primary Energy Consumed by the Industrial Sector`[612:661] / ConsumptionAYearly$`Total Energy Consumed by the Industrial Sector`[612:661]
+)
+Question <- Question %>%
+  separate(Year, into = c("Year","disregard"), sep = " ", convert = TRUE) %>%
+  gather(Residential.Proportion, Commercial.Proportion, Industrial.Proportion, key = Description, value = Proportion) %>%
+  arrange(Year)
+ggplot(data = Question, aes(x = Year, y = Proportion, color = Description)) + geom_line()
+```
+
+Each sector's primary energy consumption decreases in proportion until around 2000 for the industrial sector and 2010 for the commercial and residential sectors, after which they start increasing. There is a relation between the sector and how much of its energy consumption is primary consumption.
+
+Each sector's primary energy consumption decreases in proportion until around 2000 for the industrial sector and 2010 for the commercial and residential sectors, after which they start increasing. There is a relation between the sector and how much of its energy consumption is primary consumption.
+
+
+# Orator 1: William Hayward
+
+### Q1: How does energy consumption by source change by season? Is this effect, or lack thereof, consistent across all types of sources and years?
+
+
+First, I created a season column. Since our data was organized by month, I generalized the seasons into 3 months each: 
+  Winter - December, January, February
+  Spring - March, April, May
+  Summer - June, July, August
+  Autumn - September, October, November
+
+```{r}
+# create column for season
+Energy$Season = NA
+# assign each month to a season using for loop
+for (i in 1:nrow(Energy)) {
+  if (Energy$Month[i] == "January" | Energy$Month[i] == "December" | Energy$Month[i] == "February") {
+    Energy$Season[i] = "Winter"
+  }
+  if (Energy$Month[i] == "March" | Energy$Month[i] == "April" | Energy$Month[i] == "May") {
+    Energy$Season[i] = "Spring"
+  }
+  if (Energy$Month[i] == "June" | Energy$Month[i] == "July" | Energy$Month[i] == "August") {
+    Energy$Season[i] = "Summer"
+  }
+  if (Energy$Month[i] == "September" | Energy$Month[i] == "October" | Energy$Month[i] == "November") {
+    Energy$Season[i] = "Autumn"
+  }
+}
+# clean up memory
+rm(i)
+```
+
+Next, I filtered the data so it only included dates and information about consumption by source. Then, I grouped it by season to answer the first part of my question. 
+
+```{r}
+ordered_seasons = c("Winter", "Spring", "Summer", "Autumn")
+# call function
+Energy %>%
+    select(Year, Season, contains("Consumption"), -contains("Primary")) %>%
+    group_by(Season) %>%
+    summarize(
+      avgFossilFuel = mean(`Total Fossil Fuels Consumption`),
+      avgNuclear = mean(`Nuclear Electric Power Consumption`),
+      avgRenewable = mean(`Total Renewable Energy Consumption`)
+    ) %>%
+  # gather data to create stacked barplot
+  gather(energySource, value, 2:4) %>%
+  ggplot(mapping = aes(x = factor(Season, ordered_seasons), y = value, fill = energySource)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Season", y = "Avg. Consumption (Trillion Btu)") +
+    scale_fill_discrete(name = "Energy Source", labels = c("Fossil Fuels", "Nuclear", "Renewables"))
+# clean up memory
+rm(ordered_seasons)
+```
+
+As shown by the plot above, energy usage is highest in the winter. Although no definite conclusions can be made, this is likely because natural gas usage is higher from heating buildings.
+
+For the second part of my question, I grouped the data by season and year to make a line chart with year on the x-axis.
+
+``` {r}
+Energy$Year = as.numeric(Energy$Year)
+Energy %>%
+  select(Year, Season, contains("Consumption"), -contains("Primary")) %>%
+  group_by(Season, Year) %>%
+  summarize(
+    avgFossilFuel = mean(`Total Fossil Fuels Consumption`),
+    avgNuclear = mean(`Nuclear Electric Power Consumption`),
+    avgRenewable = mean(`Total Renewable Energy Consumption`)
+  ) %>%
+  # How does energy consumption by source change by season? Is this effect, or lack thereof, consistent across all types of sources and years?
+  ungroup() %>%
+  gather(energySource, value, 3:5) %>%
+  ggplot(aes(x = Year)) +
+    geom_line(aes(y = value, color = energySource)) +
+    facet_wrap(vars(Season)) +
+    labs(x = "Year", y = "Avg. Consumption (Trillion Btu)") +
+    scale_color_discrete(name = "Energy Source", labels = c("Fossil Fuels", "Nuclear", "Renewables"))
+```
+
+Based on the above graphs, this trend is only consistent for fossil fuels. Fossil fuel usage in the Winter has historically been higher than usage in the Summer. However, the difference in usage between the seasons has decreased over time. Comparing the most recent values to the values around 1980 show that average fossil fuel usage in the summer has increased over time.
+
+### Q2: Do certain changes in energy consumption hint at a possibility of economic recessions? Is this effect, or lack thereof, consistent across the sectors? How are some sectors more or less affected by the assumed periods of economic recessions?
+
+
+According to [Investopedia](https://www.investopedia.com/articles/economics/08/past-recessions.asp), there were 6 economic recessions in the US during the time period of available data:
+
+1. The Iran and Volcker Recession, Pt. 1
+  + January 1980 - July 1980
+2. The Iran and Volcker Recession, Pt. 2
+  + July 1981 - November 1982
+3. The Gulf War Recession
+  + July 1990 - March 1991
+4. The Dot-Bomb Recession
+  + March 2001 - November 2001
+5. The Great Recession
+  + December 2007 - June 2009
+6. The COVID-19 Recession
+  + February 2020 - April 2020
+
+```{r}
+
+# create date column in energy using the date format. REQUIRED FOR GGPLOT
+Energy$Date = paste(Energy$Year, Energy$Month, "01", sep = " ")
+Energy$Date = as.Date(Energy$Date, "%Y %B %d")
+
+# used to make legend in plot
+colors = c("Industrial" = "#564D80", "Transportation" = "#33202a", "Residential" = "#8aea92", "Commercial" = "#80ada0", "Recession" = "#a1a1a1")
+
+Energy %>%
+  select(Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  ggplot(aes(x = Date)) +
+  # iran pt 1
+    geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("1980-01-01"), xmax = as.Date("1980-06-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # iran pt 2
+    geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("1981-07-01"), xmax = as.Date("1982-11-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # gulf war
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("1990-07-01"), xmax = as.Date("1991-03-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # dot bomb
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("2001-03-01"), xmax = as.Date("2001-11-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # housing crisis
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("2007-12-01"), xmax = as.Date("2009-06-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # covid
+  geom_rect(inherit.aes = FALSE, aes(xmin = as.Date("2020-02-01"), xmax = as.Date("2020-04-01"), ymin = 0, ymax = 3000, fill = "Recession")) +
+  # sector consumption. span argument used to remove sharp differences between months.
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Residential Sector`, color = "Residential")) +
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Commercial Sector`, color = "Commercial")) +
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Industrial Sector`, color = "Industrial")) +
+    geom_smooth(se = F, span = 0.05, aes(y = `Total Energy Consumed by the Transportation Sector`, color = "Transportation")) +
+  scale_color_manual(name = "Sector", values = colors) +
+  scale_fill_manual(name = " ", values = colors) +
+  labs(y = "Total Energy Consumption (Trillion Btu)", x = "Date")
+
+# free up memory
+rm(colors)
+```
+
+In the above graph, the total energy consumption by month was plotted using a LOESS regression with a smoothing parameter of 0.05. This was done to reduce sharp differences between months that would make the graph difficult to read. Additionally, I added indicators to highlight periods of economic recession. 
+
+Based on the graph, periods of recession are associated with a decrease in energy consumption across all sectors. However, a decrease in consumption does not indicate a recession. For example, the Residential sector had a sharper decrease in energy around 1994 than it did during the 2008 Housing Crisis. The Industrial and Transportation sectors are most affected by periods of economic recessions. In comparison to the Residential and Commercial sectors, the Industrial and Transportation sectors saw sharper declines in energy consumption. The housing crisis highlights this phenomenon. 
+
+# Orator 2: Deeya Pathak
+
+### Q1: Which sectors have the largest difference between primary and end-use energy consumption annually? How do they compare with each other? Are there relationships between sectors for these energy differences?
+
+Primary energy consumption, measured in trillions of BTU, refers to the total amount of energy initially harvested from a source, while end-use energy consumption, also measured in trillions of BTU, focuses on the energy that was actually used.
+
+Using the EnergyConsumption dataset, I first created a new variable called `Year` by separating the `Month` variable in order to conduct my analysis. After grouping the data by year, I calculated the average primary energy consumed and average end-use energy consumed for three sectors: Residential, Commercial, and Industrial. These three sectors were selected for consistency purposes, because the original dataset had information on these three sectors. Finally, I calculated the difference between end-use and primary consumption per sector. All of these calculations per year are stored in a tibble called EnergyConsumption3.
+
+```{r}
+EnergyConsumption2 = EnergyConsumption %>%
+  separate(Month, into = c("Year", "Month"), sep = " ") %>%
+  group_by(Year) %>%
+  mutate_at(1, as.numeric)
+  
+
+(EnergyConsumption3 = EnergyConsumption2 %>%
+  summarize(prim_res_avg = mean(`Primary Energy Consumed by the Residential Sector`),
+            end_res_avg = mean(`End-Use Energy Consumed by the Residential Sector`),
+            res_diff = end_res_avg - prim_res_avg,
+            prim_comm_avg = mean(`Primary Energy Consumed by the Commercial Sector`),
+            end_comm_avg = mean(`End-Use Energy Consumed by the Commercial Sector`),
+            comm_diff = end_comm_avg - prim_comm_avg,
+            prim_ind_avg = mean(`Primary Energy Consumed by the Industrial Sector`),
+            end_ind_avg = mean(`End-Use Energy Consumed by the Industrial Sector`),
+            ind_diff = end_ind_avg - prim_ind_avg,
+            .groups = 'drop'))
+```
+
+After forming the above tibble, I calculated the average values of the mean differences of each sector. The average annual residential sector difference between end-use and primary energy consumption is 310.74 trillion BTU; the average annual commercial sector difference between end-use and primary energy consumption is 285.04 trillion BTU; and the average annual industrial sector difference between end-use and primary energy consumption is 265.30 trillion BTU.
+
+```{r}
+residential_avg <- mean(EnergyConsumption3$res_diff)
+commercial_avg <- mean(EnergyConsumption3$comm_diff)
+industrial_avg <- mean(EnergyConsumption3$ind_diff)
+```
+
+I created a scatter plot to display the primary and end-use consumption of the specified sectors over time. It was interesting to see that the industrial sector consumption (primary and end-use) was over 500 trillion BTU higher than the other sectors.
+
+```{r}
+ggplot(EnergyConsumption3, aes(x=Year)) + 
+  geom_point(aes(y=prim_res_avg, color = "Primary Residential Sector Consumption")) +
+  geom_point(aes(y=prim_comm_avg, color = "Primary Commercial Sector Consumption")) +
+  geom_point(aes(y=prim_ind_avg, color = "Primary Industrial Sector Consumption")) +
+  geom_point(aes(y=end_res_avg, color = "End-use Residential Sector Consumption")) +
+  geom_point(aes(y=end_comm_avg, color = "End-use Commercial Sector Consumption")) +
+  geom_point(aes(y=end_ind_avg, color = "End-use Industrial Sector Consumption")) +
+  labs(title = "Plot of Primary and End-Use Energy Consumption", x = "Year", y = "Difference") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom",
+        legend.text = element_text(size = 6), 
+    legend.title = element_text(size = 8)) +
+  scale_color_manual(name = "Differences",
+                     breaks = c("Primary Residential Sector Consumption", 
+                                "Primary Commercial Sector Consumption", 
+                                "Primary Industrial Sector Consumption",
+                                "End-use Residential Sector Consumption", 
+                                "End-use Commercial Sector Consumption", 
+                                "End-use Industrial Sector Consumption"), 
+                     values = c("Primary Residential Sector Consumption" = "#8aea92", 
+                                "Primary Commercial Sector Consumption" = "#80ada0",
+                                "Primary Industrial Sector Consumption" = "#564D80",
+                                "End-use Residential Sector Consumption" = "orange", 
+                                "End-use Commercial Sector Consumption" = "blue", 
+                                "End-use Industrial Sector Consumption" = "purple"))
+```
+
+I created a second plot using the annual differences between average end-use and primary use energy consumption in each sector to view overall trends over time. The graph shows that the Industrial Sector difference in consumption changed the least between 1973 and 2023, while the Commercial Sector difference in consumption changed the most. Smaller differences can be used to determine efficiency, so from this graph, we can conclude that the commercial sector used to be the most efficient in energy consumption until 1997, but since then, the industrial sector has been more efficient.
+
+```{r}
+ggplot(EnergyConsumption3, aes(x=Year)) + 
+  geom_point(aes(y=res_diff, color = "Residential Sector Difference")) +
+  geom_point(aes(y=comm_diff, color = "Commercial Sector Difference")) +
+  geom_point(aes(y=ind_diff, color = "Industrial Sector Difference")) +
+  labs(title = "Differences between Primary and End-Use Energy Consumption", x = "Year", y = "Difference") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom") +
+  scale_color_manual(name = "Differences",
+                     breaks = c("Residential Sector Difference", 
+                                "Commercial Sector Difference", 
+                                "Industrial Sector Difference"), 
+                     values = c("Residential Sector Difference" = "#8aea92", 
+                                "Commercial Sector Difference" = "#80ada0",
+                                "Industrial Sector Difference" = "#564D80"))
+```
+
+### Q2: Is there a relationship between primary energy imports and exports? If so, is it positive, negative, or neutral? How strong is the correlation?
+
+A scatterplot betweeen primary energy imports and exports shows an interesting relationship between the two variables. There appears to be a mostly neutral relationship, except for the discrepancy between import levels between ~1500 and ~2500 trillion BTU and export levels greater than 1000 trillion BTU. I graphed a linear model with a correlation coefficient of 0.12, suggesting a weak but positive relationship.
+
+```{r}
+correlation_coefficient <- cor(PrimaryEnergyOverview$`Primary Energy Imports`, PrimaryEnergyOverview$`Primary Energy Exports`)
+
+ggplot(PrimaryEnergyOverview, aes(x=`Primary Energy Imports`, y=`Primary Energy Exports`)) +
+  geom_point() +
+  geom_smooth(method=lm) +
+  geom_text(x = max(PrimaryEnergyOverview$`Primary Energy Imports`), 
+            y = max(PrimaryEnergyOverview$`Primary Energy Exports`), 
+            label = paste("Correlation coefficient:",
+                          round(correlation_coefficient,
+                                digits = 2)),
+                                hjust = 1,
+                                vjust = 1) +
+  labs(title = "Primary Energy Imports vs Primary Energy Exports",
+       x = "Imports (trillion BTU)", y = "Exports (trillion BTU)")
+```
+
+Since the import/export relationship was intriguing, I wanted to see if Year was a potential covariate. Since the data ranged from 1973 - 2023, I chose to categorize the years into decades to provide an easier visual.
+
+```{r}
+PrimaryEnergyOverview2 = PrimaryEnergyOverview %>%
+  separate(Month, into = c("Year", "Month"), sep = " ") %>%
+  group_by(Year) %>%
+  mutate_at(1, as.numeric)
+
+# create column for season
+PrimaryEnergyOverview2$YearGroup = NA
+# assign each month to a season using for loop
+for (i in 1:nrow(PrimaryEnergyOverview2)) {
+  if (PrimaryEnergyOverview2$Year[i] >= 1973 & PrimaryEnergyOverview2$Year[i] <= 1983) {
+    PrimaryEnergyOverview2$YearGroup[i] <- "1973 - 1983"
+  }
+  if (PrimaryEnergyOverview2$Year[i] >= 1984 & PrimaryEnergyOverview2$Year[i] <= 1993) {
+    PrimaryEnergyOverview2$YearGroup[i] <- "1984 - 1993"
+  }
+  if (PrimaryEnergyOverview2$Year[i] >= 1994 & PrimaryEnergyOverview2$Year[i] <= 2003) {
+    PrimaryEnergyOverview2$YearGroup[i] <- "1994 - 2003"
+  }
+  if (PrimaryEnergyOverview2$Year[i] >= 2004 & PrimaryEnergyOverview2$Year[i] <= 2013) {
+    PrimaryEnergyOverview2$YearGroup[i] <- "2004 - 2013"
+  }
+  if (PrimaryEnergyOverview2$Year[i] >= 2014 & PrimaryEnergyOverview2$Year[i] <= 2023) {
+    PrimaryEnergyOverview2$YearGroup[i] <- "2014 - 2023"
+  }
+}
+```
+
+Graphing the relationship between imports and exports and adding a color aesthetic to the YearGroup I created showed that the decade that I look at has an impact on this relationship, from 2004 onwards. Between 1973 and 2003, although imports did increase over time, there isn't much change in the level of exports.
+
+```{r}
+ggplot(PrimaryEnergyOverview2, aes(x=`Primary Energy Imports`, y=`Primary Energy Exports`, color = YearGroup)) +
+  geom_point() +
+  geom_smooth(method=lm) +
+  labs(title = "Primary Energy Imports vs Primary Energy Exports",
+       x = "Imports (trillion BTU)", y = "Exports (trillion BTU)") +
+  theme(legend.position = "bottom")
+```
+
+
+# Deliverer: Jennifer Kwon
+
+### Q1: Which sector has the highest total energy consumption?
+```{r}
+Energy %>%
+  select(starts_with("Total") & (ends_with("Sector") | ends_with("Sectors"))) %>% #selection of total energy consumption for each sector and overall energy usage
+  select(-c(4,6,7)) %>% #deselect variables that were selected from the code above but aren't relevant (not total energy for a sector or end-use)
+  gather(1:4, key = "Sector Type", value = "Sector Measurement") %>% #combine data for sectors to create a variable that has all sector type and corresponding values
+  group_by(`Sector Type`) %>% #group by sector to facilitate calculation
+  summarize(meanSector = mean(`Sector Measurement`), #average value
+            meanTotal = mean(`Total Energy Consumed by the End-Use-Sectors`), #average total
+            prop = meanSector / meanTotal) %>% #proportion of sector energy use from the total
+  kbl("html") %>% #table design
+  kable_material_dark()
+```
+The industrial sector accounts for the most consumption with 35.63% of the total average energy consumption. 
+
+### Q2: What proportions of energy consumption are energy loss across each sector? What changes do the proportions go through over time? Which sector reports the largest change in energy loss? Does this vary by the time of the year?
+
+```{r}
+Energy %>%
+  select(contains ("Energy Losses") | (starts_with("Total") & ends_with("Sector"))) %>% #selection of variables with energy loss and total energy consumption
+  rename(`Transportation Sector Electrical System Energy Losses` = `Electrical System Energy Losses Proportioned to the Transportation Sector`) %>% #rename transportation variable to align the formatting of the other variables
+  select(-8) %>% #deselect irrelevant data variable that was selected from the first line of code
+  gather(1:4, key = "Sector Type", value = "Sector Measurement") %>% #combine data for sectors to create a variable that has all sector type and corresponding values
+  gather(1:4, key = "Total Sector", value = "Total Measurement") %>% #combine data for sectors to create a variable that has all sector type and corresponding total values
+  group_by(`Sector Type`, `Total Sector`) %>% #group by sector to facilitate calculation
+  summarize(meanSector = mean(`Sector Measurement`), #average value
+            meanTotal = mean(`Total Measurement`),  #average total
+            prop = meanSector / meanTotal) %>% #proportion of sector energy loss from the total
+  .[-c(2,3,4,5,7,8,9,10,12,13,14,15), ] %>% #deselect proportion calculations where the sector types do not match (ex. energy loss from residential / total energy usage from commercial)
+  kbl("html") %>% #table design
+  kable_material_dark()
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: How did the COVID-19 pandemic affect energy usage by sector, and how much were renewable and nonrenewable energy affected by it? 
+- Q2: How are the high correlations between primary energy imports and exports from 2004 to 2023 correlated to changes in energy consumption in each sector and as a whole?
+- Q3: How much energy is wasted annually from energy loss, and to what extent are they sourced by renewable or nonrenewable energy? Around when energy loss is larger than the linear regression, energy consumption by source as a whole increases.
+- Q4: Which is a more important factor when considering changes in energy consumption: year or season? In other words, are the changes in energy consumption more notable as the years change, or are there bigger jumps in consumption within a year?
+
+### Investigation of Follow-up Questions
+
+Our group decided to investigate Q1 and Q2 in further detail.
+
+Question 1
+```{r}
+EnergyPre =
+  select(Energy, Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  filter(Date >= as.Date("2018-02-01") & Date <= as.Date("2020-01-01"))
+
+avgPreRes = mean(EnergyPre$`Total Energy Consumed by the Residential Sector`)
+avgPreCom = mean(EnergyPre$`Total Energy Consumed by the Commercial Sector`)
+avgPreInd = mean(EnergyPre$`Total Energy Consumed by the Industrial Sector`)
+avgPreTra = mean(EnergyPre$`Total Energy Consumed by the Transportation Sector`)
+
+EnergyPost =
+  select(Energy, Date, contains("Total Energy Consumed"), -contains("End-Use-Sectors")) %>%
+  filter(Date >= as.Date("2021-02-01"))
+
+avgPostRes = mean(EnergyPost$`Total Energy Consumed by the Residential Sector`)
+avgPostCom = mean(EnergyPost$`Total Energy Consumed by the Commercial Sector`)
+avgPostInd = mean(EnergyPost$`Total Energy Consumed by the Industrial Sector`)
+avgPostTra = mean(EnergyPost$`Total Energy Consumed by the Transportation Sector`)
+
+preVsPost = data.frame(
+  Sector = c("Residential", "Commercial", "Industrial", "Transportation"),
+  `Pre Pandemic` = c(avgPreRes, avgPreCom, avgPreInd, avgPreTra),
+  `Post Pandemic` = c(avgPostRes, avgPostCom, avgPostInd, avgPostTra)
+  )
+
+preVsPost %>%
+  kbl("html") %>%
+  kable_material_dark()
+rm(EnergyPost, EnergyPre, avgPostRes, avgPostCom, avgPostInd, avgPostTra, avgPreInd, avgPreTra, avgPreCom, avgPreRes)
+
+
+Q1TOT = Q1_year %>%
+  filter(between(Year, 2018, 2023)) %>%
+  select(-`Primary Energy Consumption by Year`) %>%
+  mutate(`Total Energy` = `Fossil Fuels Consumption by Year` + `Renewable Energy Consumption by Year`)
+
+(Q1RE = Q1TOT %>%
+  select(-`Fossil Fuels Consumption by Year`) %>%
+  mutate(Proportion = `Renewable Energy Consumption by Year` / `Total Energy`) %>%
+  kbl("html") %>%
+  kable_material_dark())
+
+(Q1NON = Q1TOT %>%
+  select(-`Renewable Energy Consumption by Year`) %>%
+  mutate(Proportion = `Fossil Fuels Consumption by Year` / `Total Energy`) %>%
+  kbl("html") %>%
+  kable_material_dark())
+```
+
+
+Question 2
+```{r}
+#filtering the Primary Imports and Exports Data from years 2004 and onward
+
+Extend2 <- PrimaryEnergyOverview2 %>% 
+  filter(Year >= 2004)
+
+#plotting Primary Energy Imports and Exports per Year
+
+ggplot(data = Extend2) +
+  geom_point(aes(x = Year, y = `Primary Energy Imports`)) +
+  geom_smooth(aes(x = Year, y = `Primary Energy Imports`), method = lm)
+
+ggplot(data = Extend2) +
+  geom_point(aes(x = Year, y = `Primary Energy Exports`)) +
+  geom_smooth(aes(x = Year, y = `Primary Energy Exports`), method=lm)
+
+#creating summary statistics for Primary Energy Imports and Exports
+
+Extend2 %>% group_by(Year) %>% 
+  summarize(`Minimum Energy Imports` = min(`Primary Energy Imports`, na.rm = T), `Maximum Energy Imports`= max(`Primary Energy Imports`), `Mean Energy Imports` = mean(`Primary Energy Imports`, na.rm = T), `Minimum Energy Exports` = min(`Primary Energy Exports`, na.rm = T), `Maximum Energy Exports` = max(`Primary Energy Exports`, na.rm = T), `Mean Energy Exports` = mean(`Primary Energy Exports`, na.rm = T)) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  kbl(caption = "Summary Statistics for Primary Energy Imports and Exports", "html") %>% 
+  kable_material_dark()
+
+ggplot(PrimaryEnergyOverview2 %>%
+         mutate_at(1, as.character), #convert to character to separately analyze the data for each year
+       aes(x=`Primary Energy Imports`, y=`Primary Energy Exports`, color = Year)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE) +
+  labs(title = "Primary Energy Imports vs Primary Energy Exports",
+       x = "Imports (trillion BTU)", y = "Exports (trillion BTU)")
+
+PrimaryEnergyOverview2023 = PrimaryEnergyOverview2 %>%
+  filter(Year == 2023)
+
+ggplot(PrimaryEnergyOverview2023, aes(x=`Primary Energy Imports`, y=`Primary Energy Exports`)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE) +
+  labs(title = "2023 Primary Energy Imports vs Primary Energy Exports", 
+                 x = "Imports (trillion BTU)", y = "Exports (trillion BTU)")
+```
+
+# Summary
+
+The investigation of the data allowed us to have a visual understanding of the dataset among energy consumption and sources. Energy consumption for each sector differed in that the industrial sector accounted for the most and the commercial accounted for the least. Energy loss for each sector showed a different trend where the commercial sector had the most energy loss respective to the total consumption, while transportation barely had energy loss for its energy consumption. From exploring the contrast between nonrenewable and renewable energy production and consumption, we found that nonrenewable energy sources increased much more from 1973 to 2023 than renewable energy source consumption. However, this trend started to reverse itself at the beginning of the 2000s and onward. Renewable energy production and consumption both strongly impacted electrical loss, while nonrenewable energy production and consumption had decidedly fewer impacts in magnitude. Energy consumption by source by season showed a significant increase during the winter. This was unexpected due to the large consumption of electricity by AC. In hindsight, this made sense because natural gas is used to heat homes in the winter. In addition, the industrial sector used a lot more energy than the commercial sector every year. It led us to question what goes into maintaining each sector. Out of the total amount of energy consumption, less of it was primary consumption as the years went on until it started increasing again after 2000. We were surprised that the proportions of primary and end-use consumption differ so much between the industrial sector and the others. Initial exploration of the relationship between primary energy imports and exports showed an interesting pattern within a certain range of imports and exports. A basic scatter plot showed that between import ranges ~1500 to ~2500 and exports >1000, the data strayed from a mostly flat/neutral relationship. This observation encouraged us to find out more about these data points and the why behind them. Additionally, we were surprised to see the reflection of economic recessions in energy consumption; particularly, we saw that the commercial sector’s energy consumption had less of a change than the industrial sector during economic recessions. This essentially helped us lead to the additional questions to consider how real-world events affect energy trends. 
+
+
+Examining pre-pandemic (Feb 2018 - Feb 2020) and post-pandemic (Feb 2021 - Nov 2023) in the first table found a slight decrease in energy consumption across all sectors. The difference was slightly larger in the Residential and Transportation sectors. This suggests that travel restrictions may have had a slight effect on consumption in the Transportation sector. The decrease in the Residential sector was most likely from the computed post-pandemic average only containing one winter. In a previous question, it was found that winter has a higher energy use on average when compared to other seasons. Comparing the data of renewable and nonrenewable energy consumption from 2018 and 2023 revealed that in 2022, there was a decrease in renewable energy, but was soon recovered to a larger value than before the pandemic as seen in the second table. The same applied to nonrenewable energy, but they hadn’t yet reached the same level as the amount before the pandemic as seen in the third table. This reveals that presumably nonrenewable energy was more affected by the pandemic as they are still recovering to reach similar levels from pre-COVID. As of 2024, the economy is recovering and returning to levels where COVID-19 isn’t as harmful. We were curious as to how our current economy stands in comparison to pre-COVID and whether we were behind, similar, or exceeding. 
+In our initial question, we explored the relationship between primary energy imports and primary energy exports. Looking at the Primary Energy Imports vs Primary Energy Exports over decades graph, we wanted to take a closer look at individual years instead of decades. From there, the first two graphs show that Primary Energy Imports have started decreasing since 2004, as Primary Energy Exports have increased, with a sharper increase toward 2020. Additionally, there exists a higher monthly variation in Primary Energy Import data than in Primary Energy Export data. 2020 and onward saw the largest dip in mean Primary Energy Imports, while 2017 onward experienced a large uptick in mean Primary Energy Exports. These countered dips may be due to economic changes, differences in stock values, and pre- and post-pandemic conditions. We can see that 2023 had the highest level of exports based on regression lines. This makes sense, with the economy beginning to recover and continuing its improvement following the pandemic. This is useful to shape policies on trade in the future in preparation for global events.
